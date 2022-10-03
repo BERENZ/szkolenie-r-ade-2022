@@ -1,0 +1,62 @@
+---
+title: "Rozwiązanie wejściówki"
+format: html
+editor: visual
+---
+
+## Wejściówka
+
+Zadanie polega na:
+
+-   pobraniu pliku o nazwie gus-nieruch-dane.csv
+
+-   wczytaniu danych do R ustalając nowe nazwy kolumn zgodnie z
+    następującym wektorem (robimy to w funkcji wczytującej dane): 
+
+    `c("kod", "nazwa", "trans", "pow", "rok", "wartosc", "jednostka", "atrybut", "x")`
+
+**uwaga**: należy spojrzeć do pomocy funkcji wczytującej dane, aby
+sprawdzić odpowiedni argument.
+
+-   sprawdzeniu jaka była średnia liczba transakcji na podstawie kolumny
+    "wartosc".
+
+## Rozwiązanie wejściówki 
+
+Wczytanie danych z pliku csv, a zmiana nazw kolumn następuje później z
+wykorzystaniem funkcji `names(<ramka.danych>) <- wektor nazw`.
+
+```{r}
+df <- read.csv2("data-raw/gus-nieruch-dane.csv")
+
+names(df) <- c("kod", "nazwa", "trans", "pow", "rok", "wartosc", "jednostka", 
+               "atrybut", "x")
+head(df)
+```
+
+Rozwiązanie zgodnie z poleceniem czyli podajemy w funkcji `read.csv2`
+argument `col.names`, który pozwala na określenie własnych nazw kolumn.
+
+```{r}
+mean(df$wartosc, na.rm=T)
+summary(df$wartosc)
+```
+
+::: callout-tip
+## Liczba wierszy
+
+Jeżeli plik jest bardzo duży, można użyć argumentu `n` wskazując liczbę
+wierszy do wczytania.
+:::
+
+```{r}
+df <- read.csv2("data-raw/gus-nieruch-dane.csv",
+                col.names = c("kod", "nazwa", "trans", "pow", "rok", "wartosc", 
+                              "jednostka", "atrybut", "x"), 
+                nrows = 2)
+head(df)
+```
+
+Jeżeli chcemy wczytać dane spoza projektu to należy zwrócic uwagę na to
+jak podana jest ścieżka. Na windowsie należy zmienić ścieżkę z
+`C:\Users\plik.csv` na `C:\\Users\\plik.csv` lub `C:/Users/plik.csv`.

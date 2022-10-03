@@ -1,0 +1,371 @@
+---
+title: "Wprowadzenie do R"
+author: "Maciej"
+format: html
+editor: visual
+---
+
+## Pakiety na potrzeby zajęć
+
+```{r}
+library(readxl) ## wczytanie plików xlsx
+library(haven) ## wczytanie plików sav
+library(sandwich) ## odporne błędy standardowe
+library(lmtest) ## testy dotyczące założeń regresji
+```
+
+Możemy ustawiać globalne opcje na potrzeby pracy z projektem dzięki
+funkcji `options()`. Poniższa komenda zmienia liczbę wyświetlanych cyfr
+do 7 (włączając miejsca dziesiętne).
+
+```{r}
+options(digits = 7)
+```
+
+## Wczytujemy pliki oraz je wstępnie analizujemy
+
+Poniższy kod wczytuje pliki `sav` i `xlsx` i tworzy obiekty klasy
+`data.frame`. Aby wstawić symbol przypisania (`<-`) możemy użyć skrótu
+`alt + -` .
+
+```{r}
+gosp_sav <- read_sav(file = "data-raw/gospodarstwa.sav") ## warto stosować jeżeli mamy tylko jedną taką funkcję
+gosp_xlsx <- readxl::read_xlsx("data-raw/gospodarstwa.xlsx") ## może się zdarzyć, że załadujemy kilka pakietów, które mają funkcje o takich samych nazwach. Aby wstazać konkretną funkcję należy przed funkcją podać nazwę pakietu oraz dwa dwukropki
+```
+
+Jakie są wymiary naszych danych? Możemy to sprawdzić z funkcją `dim`.
+
+```{r}
+dim(gosp_xlsx) 
+```
+
+Możemy również zrobić to samo ale z innymi funkcjami, które sprawdzają
+liczbę wierszy (`nrow`) i liczbę kolumn (`ncol`). Następnie możemy je
+wyniki możemy połączyć wykorzystując funkcję `c()`, która umożliwia
+tworzenie wektorów.
+
+```{r}
+nrow(gosp_xlsx)
+ncol(gosp_xlsx)
+
+c(nrow(gosp_xlsx), ncol(gosp_xlsx)) ## c() funkcja do tworzenia wektorów
+```
+
+Obejrzymy kilka pierwszych wierszy z funkcją `head`. Argument `n`
+określa liczbę wierszy do pokazania. W poniższym przykładzie pokazujemy
+tylko 2.
+
+```{r}
+head(gosp_xlsx, n=2)
+```
+
+Jeżeli zbiór nie jest zbyt duży możemy bezpośrednio wywołać ten obiekt.
+
+```{r}
+gosp_xlsx
+```
+
+Wczytuję dane z pliku csv ale pamiętając, że kolumny rozdzielone są
+średnikami dlatego korzystamy z funkcji `read.csv2`, a nie `read.csv`.
+
+```{r}
+gosp <- read.csv2(file="data-raw/gospodarstwa.csv")
+head(gosp)
+```
+
+Jeżeli mamy pliki `csv/txt`, które są niestandardowe warto wtedy użyć
+funkcji `read.table`.
+
+## Poznajemy podstawowe funkcje z zakresu statystyki opisowej
+
+Aby dowiedzieć się jakie są unikalne wartości w danej kolumnie możemy
+zastosować funkcję `unique`.
+
+```{r}
+unique(gosp$klm) ## rekomendowane podejście dla ramek danych
+unique(gosp[,1]) ## to działa też dla macierzy
+unique(gosp[,"klm"]) ## to działa też dla macierzy
+unique(gosp[["klm"]]) ## to działa też dla list 
+```
+
+Aby dowiedzieć się ile obserwacji w zbiorze danych miało określony
+poziom zmiennej klm, możemy w tym celu wykorzystać funkcję `table`.
+
+```{r}
+tab1 <- table(gosp$klm)
+tab1
+```
+
+Aby policzyć odsetki możemy zastosować funkcję `prop.table`. Drugi kod w
+poniższym chunku przedstawia użycie tzw. potokowego przetwarzania
+danych, które w skrócie oznacza, że zamiast pisać
+
+``` r
+h(g(f(x)))
+```
+
+piszemy
+
+``` r
+x |> f() |> g() |> h()
+```
+
+```{r}
+prop.table(table(gosp$klm))
+
+gosp$klm |> 
+  table() |> 
+  prop.table()
+
+```
+
+Symbol `|>` można uzyskać korzystając ze skrótu ctrl+shift+M ale trzeba
+to aktywować przez global options -\> code.
+
+## Podstawowe funkcje statystyczne
+
+```{r}
+gosp$klm |> mean() ## mean(gosp$klm)
+gosp$klm |> sd() ## odchylenie standardowe
+gosp$klm |> summary() ## podstaowe statystyki opisowe
+gosp$klm |> quantile(probs = c(0.2,0.8)) ## kwantyle
+quantile(gosp$klm, probs=c(0.2,0.8)) # kwantyle
+```
+
+Jeżeli w danej kolumnie pojawią się braki danych (kodowane w R jako
+`NA`) wtedy nie można wyznaczyć statystyk opisowych. Aby ten problem
+rozwiązać należy dodać argument `na.rm=TRUE`.
+
+```{r}
+mean(gosp$wydg) ## z uwzględnieniem braków danych
+mean(gosp$wydg, na.rm = TRUE) ## po ich usunięciu
+```
+
+Funkcja `summary` nie wymaga podania argumentu `na.rm` ponieważ
+dostarcza informacji o brakach danych jako oddzielnej kategorii.
+
+```{r}
+summary(gosp$wydg)
+```
+
+Wizualizujemy rozkład z funkcją `hist`. W przypadku rozkładów skośnych
+rekomenduje się użycie metody Freedmana-Diaconis'a (`breaks="fd"`) lub
+Scott'a (`breaks="scott"`).
+
+```{r}
+hist(gosp$wydg)
+hist(gosp$wydg, breaks = "fd")
+hist(gosp$wydg, breaks = "scott")
+
+hist(log(gosp$wydg))
+hist(log(gosp$wydg), breaks = "fd")
+hist(log(gosp$wydg), breaks = "scott")
+```
+
+Sprawdźmy jaka jest korelacja między dochodem, a wydatkami z
+wykorzystaniem funkcji `cor`. W argumentach funkcji możemy podać jak
+należy traktować braki danych (`use="complete.obs"`) oraz metodę
+(`method="spearman"` alternatywnie `m="s"` ponieważ R korzysta z
+[partial
+matching](https://stackoverflow.com/questions/14153904/why-does-r-use-partial-matching)).
+
+```{r}
+plot(gosp$dochg, gosp$wydg)
+
+cor(gosp$dochg, gosp$wydg, use = "complete.obs")
+cor(gosp$dochg, gosp$wydg, use = "complete.obs", method="spearman")
+cor(gosp$dochg, gosp$wydg, use = "complete.obs", m="s")
+```
+
+Funkcję `cor` możemy zastosować do więcej niż dwóch zmiennych. W wyniku
+otrzymamy macierz.
+
+```{r}
+cor(gosp[ , c(1, 15, 16) ], use ="complete.obs") ## numerycznie wybieram kolumny
+cor(gosp[ , c("klm", "wydg", "dochg")], use ="complete.obs") ## tekstowo
+```
+
+## Podstawowe testy statystyczne
+
+-   test proporcji `prop.test`
+
+```{r}
+table(gosp$d21) |> prop.table()
+table(gosp$d21) 
+```
+
+```{r}
+prop.test(x = 11473, n = nrow(gosp), p = 0.40, correct = FALSE)
+prop.test(x = sum(gosp$d21 == 1), n = nrow(gosp), p = 0.40, correct = FALSE)
+```
+
+Jest to niepoprawne podejście bo bierzemy jedną próbę.
+
+```{r}
+d63_tab <- table(gosp$d63) ## przypisujemy wynik do obiektu d63_tab
+d63_tab[1] ## wybieramy pierwszy element
+d63_tab[c(1, 6)] ## wybieramy 1 i 6 element z wykorzystaniem wektora c(1,6)
+d63_tab[c(1, length(d63_tab))] ## zamiast 6 podajemy długość length(<wektor>)
+d63_tab[1:3]
+d63_tab[6:3]
+head(d63_tab,1) ## pierwszy element
+tail(d63_tab,1) ## ostatni element (pierwszy od końca)
+```
+
+```{r}
+prop.test(x = as.numeric(d63_tab[c(1,6)]), 
+          n = rep(nrow(gosp), 2)) ## c(nrow(gosp), nrow(gosp))
+
+## uwzględniamy czy braki danych jeżeli jakieś są
+
+prop.test(x = as.numeric(d63_tab[c(1,6)]), 
+          n = rep(sum(d63_tab), 2))
+
+prop.test(x = as.numeric(d63_tab[c(1,6)]), 
+          n = rep(sum(!is.na(gosp$d63)), 2))
+```
+
+Funkcja `rep`
+
+```{r}
+rep(1,5)
+rep(c(1,2),5)
+rep(c(1,2), each = 5)
+```
+
+funckcja `is.na`, która sprawdza czy w danych jest brak danych
+
+```{r}
+is.na(c(1, 2, NA))
+```
+
+-   test jednej i dwóch średnich `t.test`
+
+    ```{r}
+    t.test(x = gosp$wydg, mu = 2000)
+    t.test(x = gosp$wydg[ gosp$d63 == 1 ], mu = 2000)
+    t.test(x = gosp$wydg[ gosp$d63 %in% 1:3 ], mu = 2000)
+    t.test(x = gosp$wydg[ which(gosp$d63 %in% 1:3) ], mu = 2000, alternative = "less")
+    ```
+
+    ```{r}
+    t.test(x = gosp$wydg[gosp$d63 == 1],
+           y = gosp$wydg[gosp$d63 == 2], 
+           var.equal = FALSE, 
+           mu = -300)
+    ```
+
+-   test wielu średnich `aov`
+
+    ```{r}
+    aov(formula = wydg ~ factor(d63), data = gosp)
+
+    aov(formula = wydg ~ factor(d63), data = gosp) |> summary()
+
+    ```
+
+    ```{r}
+    anova1 <- aov(formula = wydg ~ factor(d63), data = gosp) 
+
+    TukeyHSD(anova1, "factor(d63)")
+    ```
+
+    `factor` to typ wektora, który zakłada, że wartości mają jakieś
+    znaczenie
+
+    ```{r}
+    gosp$d63_f <- as.factor(gosp$d63) ## zmieniamy na typ factor ale nie podajemy poziomów
+
+    gosp$d63_f2 <- factor(gosp$d63, 
+                          levels = 1:6, 
+                          labels = c("Z w. trud.", "Z trud.", "Z p. trud.",
+                                     "R. łatwo", "Łatwo", "B. łatwo"),
+                          ordered = T)
+
+    table(gosp$d63_f2)
+
+    ## usuniecie kolumny
+    gosp$d63_f <- NULL
+    table(gosp$d63_f2)
+    ```
+
+-   testy nieparametryczne -- dwie grupy `wilcox.test`
+
+    ```{r}
+    wilcox.test(x = gosp$wydg[gosp$d63 == 1],
+                y = gosp$wydg[gosp$d63 == 2], 
+                mu = -100,
+                conf.int = TRUE)
+    ```
+
+-   test nieparametryczny -- trzy i więcej grup `kruskall.test`
+
+```{r}
+kruskal.test(formula = wydg ~ d63_f2, 
+             data = gosp)
+```
+
+-   testy jedorodności wariancji -- `var.test`
+
+    ```{r}
+    var.test(formula = wydg ~ d348, data = gosp) ## parametryczny
+    ansari.test(formula = wydg ~ d348, data = gosp) ## nieparametryczne
+    ```
+
+-   testy normalności rozkładu -- `shapiro.test` (pakiet `nortest`
+    zawiera więcej testów)
+
+    ```{r}
+    #shapiro.test(gosp$wydg) ## do 5k obserwacji
+
+    ks.test(gosp$wydg, "pnorm", mean=mean(gosp$wydg,na.rm=T), sd=sd(gosp$wydg,na.rm=T))
+
+    g1 <- gosp$wydg[gosp$d348==1]
+    g2 <- gosp$wydg[gosp$d348==2]
+
+    ks.test(g1, "pnorm", 
+            mean=mean(g1,na.rm=T), 
+            sd=sd(g1,na.rm=T))
+
+    ks.test(g2, "pnorm", 
+            mean=mean(g2,na.rm=T), 
+            sd=sd(g2,na.rm=T))
+
+    ```
+
+-   test niezależnosci $\chi^2$
+
+```{r}
+xtabs( ~ d61 + d63, data = gosp) |> summary()
+
+xtabs( ~ d61 + d63, data = gosp) |> chisq.test()
+
+table(gosp$d61, gosp$d63) |> summary()
+
+table(gosp$d61, gosp$d63) |> chisq.test()
+```
+
+## Regresja liniowa
+
+```{r}
+m1 <- lm(formula = log(wydg) ~ I(dochg/1000) + factor(klm) + factor(d63),
+         data = gosp)
+summary(m1)
+anova(m1)
+plot(m1)
+```
+
+```{r}
+coeftest(m1)
+coeftest(m1, vcovHC)
+coeftest(m1, vcovHC(x = m1, type = "HC3"))
+coeftest(m1, vcovCL(x = m1, cluster = ~ woj))
+```
+
+## Zapisanie danych do pliku
+
+```{r}
+saveRDS(gosp, file="data/gosp.rds") ## readRDS
+write.csv2(gosp, row.names = F, file = "data/gosp.csv")
+
+```
